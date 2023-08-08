@@ -78,7 +78,7 @@ install-operator:
 # 卸载operator
 .PHONY: uninstall-operator
 uninstall-operator:
-	-kubectl delete -f deploy/sample/redis-operator.yaml
+	-kubectl delete -f deploy/operator/redis-operator.yaml
 	-kubectl delete -f deploy/operator/db.ibm.com_redisclusters.yaml
 
 # 部署redis-cluster
