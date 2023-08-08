@@ -1,7 +1,7 @@
 ARTIFACT_OPERATOR=redis-operator
 ARTIFACT_INITCONTAINER=init-container
 
-PREFIX=ibmcom/
+PREFIX=172.30.3.150/devops/redis-
 
 SOURCES := $(shell find . ! -name "*_test.go" -name '*.go')
 
@@ -14,7 +14,9 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-TAG?=$(shell git tag|tail -1)
+# TAG?=$(shell git tag|tail -1)
+TAG=latest
+REDIS_VERSION=6.2.5
 COMMIT=$(shell git rev-parse HEAD)
 DATE=$(shell date +%Y-%m-%d/%H:%M:%S)
 BUILDINFOPKG=github.com/IBM/operator-for-redis-cluster/pkg/utils
@@ -28,13 +30,13 @@ install-plugin:
 	./tools/install-plugin.sh
 
 build-%:
-	CGO_ENABLED=0 go build -installsuffix cgo ${LDFLAGS} -o bin/$* ./cmd/$*
+	CGO_ENABLED=0 GOOS=linux go build -installsuffix cgo ${LDFLAGS} -o bin/$* ./cmd/$*
 
 buildlinux-%: ${SOURCES}
 	CGO_ENABLED=0 GOOS=linux go build -installsuffix cgo ${LDFLAGS} -o docker/$*/$* ./cmd/$*/main.go
 
 container-%: buildlinux-%
-	docker build -t $(PREFIX)$*-for-redis:$(TAG) -f Dockerfile.$* .
+	docker build -t $(PREFIX)$*:$(TAG) -f Dockerfile.$* .
 
 build: $(addprefix build-,$(CMDBINS))
 
@@ -70,7 +72,7 @@ test:
 	./go.test.sh
 
 push-%: container-%
-	docker push $(PREFIX)$*-for-redis:$(TAG)
+	docker push $(PREFIX)$*:$(TAG)
 
 push: $(addprefix push-,$(CMDBINS))
 

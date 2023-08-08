@@ -126,7 +126,7 @@ spec:
               app.kubernetes.io/instance: redis
       containers:
         - name: operator
-          image: "172.30.3.150/devops/redis-operator-ibm:latest"
+          image: "172.30.3.150/devops/redis-operator:latest"
           imagePullPolicy: Allways
           env:
           - name: NAMESPACE
