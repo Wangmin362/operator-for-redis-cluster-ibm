@@ -1,8 +1,8 @@
 apiVersion: v2
-name: node-for-redis
+name: cluster
 type: application
-version: 0.0.0     # Overridden by release workflow
-appVersion: 0.0.0  # Overridden by release workflow
+version: 0.3.14     # Overridden by release workflow
+appVersion: 1.25.12  # Overridden by release workflow
 description: Cluster node for interfacing with Redis
 maintainers:
   - name: tomashibm  # Tomash Sidei

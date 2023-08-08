@@ -43,7 +43,7 @@ buildlinux: $(addprefix buildlinux-,$(CMDBINS))
 container: $(addprefix container-,$(CMDBINS))
 
 manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role output:rbac:none paths="./..." output:crd:artifacts:config=charts/operator-for-redis/crds/
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role output:rbac:none paths="./..." output:crd:artifacts:config=charts/redis-operator/crds/
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object paths="./..."
@@ -62,9 +62,9 @@ endif
 
 .PHONY: deploy
 deploy: generate manifests
-	# helm install --dry-run --debug redis-operator-ibm charts/operator-for-redis > deploy/operator/redis-operator.yaml
-	helm template --debug xxxxxxx charts/redis-operator > deploy/operator/redis-operator.yaml
-	helm template --debug redis-cluster-ibm charts/redis-cluster > deploy/sample/redis-cluster.yaml
+	helm template --debug redis charts/redis-operator -n redis-system-ibm > deploy/operator/redis-operator.yaml
+	/usr/bin/cp -f charts/redis-operator/crds/db.ibm.com_redisclusters.yaml deploy/operator/db.ibm.com_redisclusters.yaml
+	helm template --debug redis charts/redis-cluster  -n redis-system-ibm > deploy/sample/redis-cluster.yaml
 
 test:
 	./go.test.sh

@@ -1,48 +1,48 @@
 ---
-# Source: node-for-redis/templates/serviceaccount.yaml
+# Source: cluster/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: redis-operator-ibm
+  name: redis-cluster
   labels:
-    app.kubernetes.io/name: node-for-redis
-    app.kubernetes.io/instance: redis-cluster-ibm
+    app.kubernetes.io/name: cluster
+    app.kubernetes.io/instance: redis
     app.kubernetes.io/component: database
     
-    helm.sh/chart: node-for-redis-0.0.0
+    helm.sh/chart: cluster-0.3.14
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/version: "1.25.12"
 ---
-# Source: node-for-redis/templates/configmap.yaml
+# Source: cluster/templates/configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: redis-cluster-ibm-node-for-redis
+  name: redis-cluster
   labels:
-    app.kubernetes.io/name: node-for-redis
-    app.kubernetes.io/instance: redis-cluster-ibm
+    app.kubernetes.io/name: cluster
+    app.kubernetes.io/instance: redis
     app.kubernetes.io/component: database
     
-    helm.sh/chart: node-for-redis-0.0.0
+    helm.sh/chart: cluster-0.3.14
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/version: "1.25.12"
 data:
   redis.yaml: |-
   redis.conf: |-
 ---
-# Source: node-for-redis/templates/rbac.yaml
+# Source: cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: redis-cluster-ibm-node-for-redis
+  name: redis-cluster
   labels:
-    app.kubernetes.io/name: node-for-redis
-    app.kubernetes.io/instance: redis-cluster-ibm
+    app.kubernetes.io/name: cluster
+    app.kubernetes.io/instance: redis
     app.kubernetes.io/component: database
     
-    helm.sh/chart: node-for-redis-0.0.0
+    helm.sh/chart: cluster-0.3.14
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/version: "1.25.12"
 rules:
 - apiGroups: [""]
   resources: ["namespaces", "services", "endpoints", "pods", "nodes"]
@@ -51,45 +51,45 @@ rules:
   resources: ["rediscluster","redisclusters"]
   verbs: ["list", "get", "watch"]
 ---
-# Source: node-for-redis/templates/rbac.yaml
+# Source: cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: redis-cluster-ibm-node-for-redis
+  name: redis-cluster
   labels:
-    app.kubernetes.io/name: node-for-redis
-    app.kubernetes.io/instance: redis-cluster-ibm
+    app.kubernetes.io/name: cluster
+    app.kubernetes.io/instance: redis
     app.kubernetes.io/component: database
     
-    helm.sh/chart: node-for-redis-0.0.0
+    helm.sh/chart: cluster-0.3.14
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/version: "1.25.12"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: redis-cluster-ibm-node-for-redis
+  name: redis-cluster
 subjects:
 - kind: ServiceAccount
-  name: redis-operator-ibm
-  namespace: default
+  name: redis-cluster
+  namespace: redis-system-ibm
 ---
-# Source: node-for-redis/templates/rediscluster.yaml
+# Source: cluster/templates/rediscluster.yaml
 apiVersion: db.ibm.com/v1alpha1
 kind: RedisCluster
 metadata:
-  name: redis-cluster-ibm-node-for-redis
+  name: redis-cluster
   labels:
-    app.kubernetes.io/name: node-for-redis
-    app.kubernetes.io/instance: redis-cluster-ibm
+    app.kubernetes.io/name: cluster
+    app.kubernetes.io/instance: redis
     app.kubernetes.io/component: database
     
-    helm.sh/chart: node-for-redis-0.0.0
+    helm.sh/chart: cluster-0.3.14
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/version: "1.25.12"
 spec:
   numberOfPrimaries: 3
   replicationFactor: 1
-  serviceName: redis-cluster-ibm-node-for-redis
+  serviceName: redis-cluster
   zoneAwareReplication: true
   rollingUpdate:
     idleTimeoutMillis: 30000
@@ -104,11 +104,11 @@ spec:
   podTemplate:
     metadata:
       labels:
-        app.kubernetes.io/name: node-for-redis
-        app.kubernetes.io/instance: redis-cluster-ibm
+        app.kubernetes.io/name: cluster
+        app.kubernetes.io/instance: redis
         app.kubernetes.io/component: database
     spec:
-      serviceAccountName: redis-operator-ibm
+      serviceAccountName: redis-cluster
       securityContext:
         {}
       topologySpreadConstraints:
@@ -117,8 +117,8 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              app.kubernetes.io/name: node-for-redis
-              app.kubernetes.io/instance: redis-cluster-ibm
+              app.kubernetes.io/name: cluster
+              app.kubernetes.io/instance: redis
               app.kubernetes.io/component: database
       initContainers:
         - name: sysctl-init
@@ -137,14 +137,14 @@ spec:
         - name: redis-node
           securityContext:
             {}
-          image: "ibmcom/node-for-redis:0.0.0"
+          image: "172.22.175.150/community/redis/redis:6.2.5"
           imagePullPolicy: IfNotPresent
           args: [
             "--v=1",
             "--c=/redis-conf/redis.conf",
             "--logtostderr=true",
             "--alsologtostderr=true",
-            "--rs=redis-cluster-ibm-node-for-redis",
+            "--rs=redis-cluster",
             "--t=10s",
             "--d=10s",
             "--ns=$(POD_NAMESPACE)",
@@ -190,7 +190,12 @@ spec:
             successThreshold: 1
             timeoutSeconds: 5
           resources:
-            {}
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
           volumeMounts:
             - name: data
               mountPath: /redis-data
@@ -207,7 +212,7 @@ spec:
           emptyDir: {}
         - name: extra-conf
           configMap:
-            name: redis-cluster-ibm-node-for-redis
+            name: redis-cluster
             items:
               - key: redis.conf
                 path: redis.conf
