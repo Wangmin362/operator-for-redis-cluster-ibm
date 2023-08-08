@@ -62,8 +62,9 @@ endif
 
 .PHONY: deploy
 deploy: generate manifests
-	helm template redis-cluster-ibm charts/operator-for-redis --debug > deploy/operator/redis-operator.yaml
-	helm template redis-cluster-ibm charts/node-for-redis --debug > deploy/sample/redis-cluster.yaml
+	# helm install --dry-run --debug redis-operator-ibm charts/operator-for-redis > deploy/operator/redis-operator.yaml
+	helm template --debug xxxxxxx charts/redis-operator > deploy/operator/redis-operator.yaml
+	helm template --debug redis-cluster-ibm charts/redis-cluster > deploy/sample/redis-cluster.yaml
 
 test:
 	./go.test.sh
