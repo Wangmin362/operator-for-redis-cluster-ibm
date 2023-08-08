@@ -4,6 +4,7 @@ kind: Service
 metadata:
   name: {{ include "node-for-redis.fullname" . }}-metrics
   labels: {{- include "node-for-redis-metrics.labels" . | nindent 4 }}
+  namespace: {{ .Release.Namespace | quote }}
 spec:
   type: ClusterIP
   ports:

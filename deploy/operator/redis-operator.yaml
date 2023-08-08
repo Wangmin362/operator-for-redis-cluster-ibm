@@ -9,6 +9,7 @@ metadata:
     app.kubernetes.io/name: operator
     app.kubernetes.io/instance: redis
     app.kubernetes.io/managed-by: Helm
+  namespace: "redis-system-ibm"
 ---
 # Source: operator/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -75,6 +76,7 @@ metadata:
     app.kubernetes.io/name: operator
     app.kubernetes.io/instance: redis
     app.kubernetes.io/managed-by: Helm
+  namespace: "redis-system-ibm"
 spec:
   type: ClusterIP
   ports:
@@ -126,8 +128,8 @@ spec:
               app.kubernetes.io/instance: redis
       containers:
         - name: operator
-          image: "172.30.3.150/devops/redis-operator:latest"
-          imagePullPolicy: Allways
+          image: "172.22.175.150/devops/redis-operator:latest"
+          imagePullPolicy: Always
           env:
           - name: NAMESPACE
             value: "redis-system-ibm"

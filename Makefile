@@ -1,7 +1,7 @@
 ARTIFACT_OPERATOR=redis-operator
 ARTIFACT_INITCONTAINER=init-container
 
-PREFIX=172.30.3.150/devops/redis-
+PREFIX=172.22.175.150/devops/redis-
 
 SOURCES := $(shell find . ! -name "*_test.go" -name '*.go')
 
@@ -62,11 +62,35 @@ else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
-.PHONY: deploy
-deploy: generate manifests
+# 产生资源清单文件
+.PHONY: gen-deploy
+gen-deploy: generate manifests
 	helm template --debug redis charts/redis-operator -n redis-system-ibm > deploy/operator/redis-operator.yaml
 	/usr/bin/cp -f charts/redis-operator/crds/db.ibm.com_redisclusters.yaml deploy/operator/db.ibm.com_redisclusters.yaml
 	helm template --debug redis charts/redis-cluster  -n redis-system-ibm > deploy/sample/redis-cluster.yaml
+
+# 部署operator
+.PHONY: install-operator
+install-operator:
+	-kubectl create -f deploy/operator/db.ibm.com_redisclusters.yaml
+	-kubectl create -f deploy/operator/redis-operator.yaml
+
+# 卸载operator
+.PHONY: uninstall-operator
+uninstall-operator:
+	-kubectl delete -f deploy/sample/redis-operator.yaml
+	-kubectl delete -f deploy/operator/db.ibm.com_redisclusters.yaml
+
+# 部署redis-cluster
+.PHONY: install-redis
+install-redis:
+	kubectl create -f deploy/sample/redis-cluster.yaml
+
+# 卸载redis-clusetr
+.PHONY: uninstall-redis
+uninstall-redis:
+	kubectl delete -f deploy/sample/redis-cluster.yaml
+
 
 test:
 	./go.test.sh

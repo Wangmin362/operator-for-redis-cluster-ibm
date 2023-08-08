@@ -4,6 +4,7 @@ kind: ConfigMap
 metadata:
   name: {{ include "node-for-redis.fullname" . }}-lua-metrics
   labels: {{- include "node-for-redis.labels" . | nindent 4 }}
+  namespace: {{ .Release.Namespace | quote }}
 data:
   metrics.lua: |-
     local result = {}

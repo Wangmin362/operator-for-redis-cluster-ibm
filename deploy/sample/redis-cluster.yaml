@@ -12,6 +12,7 @@ metadata:
     helm.sh/chart: cluster-0.3.14
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "1.25.12"
+  namespace: "redis-system-ibm"
 ---
 # Source: cluster/templates/configmap.yaml
 apiVersion: v1
@@ -26,6 +27,7 @@ metadata:
     helm.sh/chart: cluster-0.3.14
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "1.25.12"
+  namespace: "redis-system-ibm"
 data:
   redis.yaml: |-
     cluster-node-timeout: "12000"
@@ -90,6 +92,7 @@ metadata:
     helm.sh/chart: cluster-0.3.14
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "1.25.12"
+  namespace: "redis-system-ibm"
 spec:
   numberOfPrimaries: 3
   replicationFactor: 1
@@ -141,7 +144,7 @@ spec:
         - name: redis-node
           securityContext:
             {}
-          image: "172.30.3.150/devops/redis-node:latest"
+          image: "172.22.175.150/devops/redis-node:latest"
           imagePullPolicy: Always
           args: [
             "--v=1",

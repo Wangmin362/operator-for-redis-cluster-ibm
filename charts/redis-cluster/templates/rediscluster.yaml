@@ -3,6 +3,7 @@ kind: RedisCluster
 metadata:
   name: {{ include "node-for-redis.fullname" . }}
   labels: {{- include "node-for-redis.labels" . | nindent 4 }}
+  namespace: {{ .Release.Namespace | quote }}
 spec:
   numberOfPrimaries: {{ .Values.numberOfPrimaries }}
   replicationFactor: {{ .Values.replicationFactor }}

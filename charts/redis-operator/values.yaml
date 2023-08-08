@@ -5,10 +5,10 @@
 replicaCount: 1
 
 image:
-  repository: 172.30.3.150/devops/redis-operator
+  repository: 172.22.175.150/devops/redis-operator
   # Overrides the image tag whose default is the chart appVersion
   tag: latest
-  pullPolicy: Allways
+  pullPolicy: Always
 
 logLevel: 2
 strategy:

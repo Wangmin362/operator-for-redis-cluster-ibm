@@ -3,6 +3,7 @@ kind: Service
 metadata:
   name: {{ include "operator-for-redis.fullname" . }}
   labels: {{- include "operator-for-redis.labels" . | nindent 4 }}
+  namespace: {{ .Release.Namespace | quote }}
 spec:
   type: {{ .Values.service.type }}
   ports:

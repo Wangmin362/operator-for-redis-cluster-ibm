@@ -6,7 +6,7 @@ numberOfPrimaries: 3
 replicationFactor: 1
 
 image:
-  repository: 172.30.3.150/devops/redis-node
+  repository: 172.22.175.150/devops/redis-node
   # Overrides the image tag whose default is the chart appVersion
   tag: latest
   pullPolicy: Always
@@ -141,7 +141,7 @@ metrics:
   enabled: false
   exporter:
     image:
-      repository: 172.30.3.150/community/redis-exporter
+      repository: 172.22.175.150/community/redis-exporter
       tag: 1.0
       pullPolicy: IfNotPresent
     port:
@@ -155,7 +155,7 @@ metrics:
       labels: {}
   server:
     image:
-      repository: 172.30.3.150/devops/redis-metrics
+      repository: 172.22.175.150/devops/redis-metrics
       tag: latest
       pullPolicy: IfNotPresent
     port:
