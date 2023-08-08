@@ -1,0 +1,220 @@
+---
+# Source: node-for-redis/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: redis-operator-ibm
+  labels:
+    app.kubernetes.io/name: node-for-redis
+    app.kubernetes.io/instance: redis-cluster-ibm
+    app.kubernetes.io/component: database
+    
+    helm.sh/chart: node-for-redis-0.0.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+---
+# Source: node-for-redis/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-cluster-ibm-node-for-redis
+  labels:
+    app.kubernetes.io/name: node-for-redis
+    app.kubernetes.io/instance: redis-cluster-ibm
+    app.kubernetes.io/component: database
+    
+    helm.sh/chart: node-for-redis-0.0.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+data:
+  redis.yaml: |-
+  redis.conf: |-
+---
+# Source: node-for-redis/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: redis-cluster-ibm-node-for-redis
+  labels:
+    app.kubernetes.io/name: node-for-redis
+    app.kubernetes.io/instance: redis-cluster-ibm
+    app.kubernetes.io/component: database
+    
+    helm.sh/chart: node-for-redis-0.0.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+rules:
+- apiGroups: [""]
+  resources: ["namespaces", "services", "endpoints", "pods", "nodes"]
+  verbs: ["list", "get", "watch"]
+- apiGroups: ["db.ibm.com"]
+  resources: ["rediscluster","redisclusters"]
+  verbs: ["list", "get", "watch"]
+---
+# Source: node-for-redis/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: redis-cluster-ibm-node-for-redis
+  labels:
+    app.kubernetes.io/name: node-for-redis
+    app.kubernetes.io/instance: redis-cluster-ibm
+    app.kubernetes.io/component: database
+    
+    helm.sh/chart: node-for-redis-0.0.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: redis-cluster-ibm-node-for-redis
+subjects:
+- kind: ServiceAccount
+  name: redis-operator-ibm
+  namespace: default
+---
+# Source: node-for-redis/templates/rediscluster.yaml
+apiVersion: db.ibm.com/v1alpha1
+kind: RedisCluster
+metadata:
+  name: redis-cluster-ibm-node-for-redis
+  labels:
+    app.kubernetes.io/name: node-for-redis
+    app.kubernetes.io/instance: redis-cluster-ibm
+    app.kubernetes.io/component: database
+    
+    helm.sh/chart: node-for-redis-0.0.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "0.0.0"
+spec:
+  numberOfPrimaries: 3
+  replicationFactor: 1
+  serviceName: redis-cluster-ibm-node-for-redis
+  zoneAwareReplication: true
+  rollingUpdate:
+    idleTimeoutMillis: 30000
+    keyBatchSize: 10000
+    keyMigration: true
+    slotBatchSize: 16
+    warmingDelayMillis: 0
+  scaling:
+    idleTimeoutMillis: 30000
+    keyBatchSize: 10000
+    slotBatchSize: 16
+  podTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: node-for-redis
+        app.kubernetes.io/instance: redis-cluster-ibm
+        app.kubernetes.io/component: database
+    spec:
+      serviceAccountName: redis-operator-ibm
+      securityContext:
+        {}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: node-for-redis
+              app.kubernetes.io/instance: redis-cluster-ibm
+              app.kubernetes.io/component: database
+      initContainers:
+        - name: sysctl-init
+          image: "alpine:3.16.0"
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - >-
+              sysctl -w net.core.somaxconn=65000;
+          resources: {}
+          securityContext:
+            privileged: true
+            procMount: Default
+      containers:
+        - name: redis-node
+          securityContext:
+            {}
+          image: "ibmcom/node-for-redis:0.0.0"
+          imagePullPolicy: IfNotPresent
+          args: [
+            "--v=1",
+            "--c=/redis-conf/redis.conf",
+            "--logtostderr=true",
+            "--alsologtostderr=true",
+            "--rs=redis-cluster-ibm-node-for-redis",
+            "--t=10s",
+            "--d=10s",
+            "--ns=$(POD_NAMESPACE)",
+            "--ip=$(POD_IP)",
+            "--cluster-node-timeout=2000",
+            "--config-file=/redis-extra-conf/redis.conf",
+            ]
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+            - name: cluster
+              containerPort: 16379
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 30
+            httpGet:
+              path: /live
+              port: http
+            initialDelaySeconds: 12
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 12
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          resources:
+            {}
+          volumeMounts:
+            - name: data
+              mountPath: /redis-data
+            - name: conf
+              mountPath: /redis-conf
+            - name: extra-conf
+              mountPath: /redis-extra-conf
+            - name: podinfo
+              mountPath: /podinfo
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: conf
+          emptyDir: {}
+        - name: extra-conf
+          configMap:
+            name: redis-cluster-ibm-node-for-redis
+            items:
+              - key: redis.conf
+                path: redis.conf
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: "mem_limit"
+                resourceFieldRef:
+                  containerName: redis-node
+                  resource: limits.memory

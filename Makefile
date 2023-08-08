@@ -43,7 +43,7 @@ buildlinux: $(addprefix buildlinux-,$(CMDBINS))
 container: $(addprefix container-,$(CMDBINS))
 
 manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role output:rbac:none paths="./..." output:crd:artifacts:config=charts/operator-for-redis-cluster/crds/
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role output:rbac:none paths="./..." output:crd:artifacts:config=charts/operator-for-redis/crds/
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object paths="./..."
@@ -53,18 +53,17 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 controller-gen:
 ifeq (, $(shell which controller-gen))
 	@{ \
-	set -e ;\
-	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$CONTROLLER_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.9.2 ;\
-	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.9.2 ;\
 	}
 CONTROLLER_GEN=$(GOBIN)/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
+.PHONY: deploy
+deploy: generate manifests
+	helm template redis-cluster-ibm charts/operator-for-redis --debug > deploy/redis-operator.yaml
+	helm template redis-cluster-ibm charts/node-for-redis --debug > deploy/redis-cluster.yaml
 
 test:
 	./go.test.sh
