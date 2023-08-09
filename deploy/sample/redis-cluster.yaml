@@ -1,30 +1,30 @@
 ---
-# Source: cluster/templates/serviceaccount.yaml
+# Source: cluster-ibm/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: redis-cluster
   labels:
-    app.kubernetes.io/name: cluster
+    app.kubernetes.io/name: cluster-ibm
     app.kubernetes.io/instance: redis
     app.kubernetes.io/component: database
     
-    helm.sh/chart: cluster-0.3.14
+    helm.sh/chart: cluster-ibm-0.3.14
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "1.25.12"
   namespace: "redis-system-ibm"
 ---
-# Source: cluster/templates/configmap.yaml
+# Source: cluster-ibm/templates/configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: redis-cluster
+  name: redis-cluster-ibm
   labels:
-    app.kubernetes.io/name: cluster
+    app.kubernetes.io/name: cluster-ibm
     app.kubernetes.io/instance: redis
     app.kubernetes.io/component: database
     
-    helm.sh/chart: cluster-0.3.14
+    helm.sh/chart: cluster-ibm-0.3.14
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "1.25.12"
   namespace: "redis-system-ibm"
@@ -36,17 +36,17 @@ data:
     cluster-node-timeout 12000
     maxclients 15000
 ---
-# Source: cluster/templates/rbac.yaml
+# Source: cluster-ibm/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: redis-cluster
+  name: redis-cluster-ibm
   labels:
-    app.kubernetes.io/name: cluster
+    app.kubernetes.io/name: cluster-ibm
     app.kubernetes.io/instance: redis
     app.kubernetes.io/component: database
     
-    helm.sh/chart: cluster-0.3.14
+    helm.sh/chart: cluster-ibm-0.3.14
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "1.25.12"
 rules:
@@ -57,46 +57,46 @@ rules:
   resources: ["rediscluster","redisclusters"]
   verbs: ["list", "get", "watch"]
 ---
-# Source: cluster/templates/rbac.yaml
+# Source: cluster-ibm/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: redis-cluster
+  name: redis-cluster-ibm
   labels:
-    app.kubernetes.io/name: cluster
+    app.kubernetes.io/name: cluster-ibm
     app.kubernetes.io/instance: redis
     app.kubernetes.io/component: database
     
-    helm.sh/chart: cluster-0.3.14
+    helm.sh/chart: cluster-ibm-0.3.14
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "1.25.12"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: redis-cluster
+  name: redis-cluster-ibm
 subjects:
 - kind: ServiceAccount
   name: redis-cluster
   namespace: redis-system-ibm
 ---
-# Source: cluster/templates/rediscluster.yaml
+# Source: cluster-ibm/templates/rediscluster.yaml
 apiVersion: db.ibm.com/v1alpha1
 kind: RedisCluster
 metadata:
-  name: redis-cluster
+  name: redis-cluster-ibm
   labels:
-    app.kubernetes.io/name: cluster
+    app.kubernetes.io/name: cluster-ibm
     app.kubernetes.io/instance: redis
     app.kubernetes.io/component: database
     
-    helm.sh/chart: cluster-0.3.14
+    helm.sh/chart: cluster-ibm-0.3.14
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/version: "1.25.12"
   namespace: "redis-system-ibm"
 spec:
   numberOfPrimaries: 3
   replicationFactor: 1
-  serviceName: redis-cluster
+  serviceName: redis-cluster-ibm
   zoneAwareReplication: true
   rollingUpdate:
     idleTimeoutMillis: 30000
@@ -111,7 +111,7 @@ spec:
   podTemplate:
     metadata:
       labels:
-        app.kubernetes.io/name: cluster
+        app.kubernetes.io/name: cluster-ibm
         app.kubernetes.io/instance: redis
         app.kubernetes.io/component: database
     spec:
@@ -124,7 +124,7 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              app.kubernetes.io/name: cluster
+              app.kubernetes.io/name: cluster-ibm
               app.kubernetes.io/instance: redis
               app.kubernetes.io/component: database
       initContainers:
@@ -151,7 +151,7 @@ spec:
             "--c=/redis-conf/redis.conf",
             "--logtostderr=true",
             "--alsologtostderr=true",
-            "--rs=redis-cluster",
+            "--rs=redis-cluster-ibm",
             "--t=10s",
             "--d=10s",
             "--ns=$(POD_NAMESPACE)",
@@ -219,7 +219,7 @@ spec:
           emptyDir: {}
         - name: extra-conf
           configMap:
-            name: redis-cluster
+            name: redis-cluster-ibm
             items:
               - key: redis.conf
                 path: redis.conf
