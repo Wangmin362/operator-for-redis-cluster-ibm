@@ -27,7 +27,8 @@ all: build
 plugin: build-kubectl-rc install-plugin
 
 install-plugin:
-	./tools/install-plugin.sh
+	# ./tools/install-plugin.sh
+	mv bin/kubectl-rc /usr/local/bin/ -f
 
 build-%:
 	CGO_ENABLED=0 GOOS=linux go build -installsuffix cgo ${LDFLAGS} -o bin/$* ./cmd/$*
