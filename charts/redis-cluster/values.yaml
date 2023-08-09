@@ -49,7 +49,7 @@ serviceAccount:
 #          -v, --v Level                      log level for V logs (default 0)
 #          --vmodule moduleSpec               comma-separated list of pattern=N settings for file-filtered logging
 args:
-  logLevel: 1
+  logLevel: 10
   logToStderr: "true"
   alsoLogToStderr: "true"
   maxStartWait: 10s

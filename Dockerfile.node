@@ -1,4 +1,4 @@
-FROM 172.30.3.149/common/alpine_timezone_shanghai:3.11.3
+FROM 172.30.3.150/community/redis/redis:6.2.5
 LABEL maintainer="William Cassanova <wssanova@us.ibm.com>, Tomash Sidei <tomash.sidei@ibm.com>, Kenny Scharm <kenny.scharm@ibm.com>"
 COPY bin/node /
 ENTRYPOINT ["/node"]

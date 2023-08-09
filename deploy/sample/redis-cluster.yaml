@@ -147,7 +147,7 @@ spec:
           image: "172.30.3.150/devops/redis-node:latest"
           imagePullPolicy: Always
           args: [
-            "--v=1",
+            "--v=10",
             "--c=/redis-conf/redis.conf",
             "--logtostderr=true",
             "--alsologtostderr=true",
