@@ -46,10 +46,11 @@ type RedisClusterList struct {
 
 // RedisClusterSpec contains RedisCluster specification
 type RedisClusterSpec struct {
-	// NumberOfPrimaries number of primary nodes
+	// NumberOfPrimaries number of primary nodes  主节点的数量
 	NumberOfPrimaries *int32 `json:"numberOfPrimaries,omitempty"`
 
 	// ReplicationFactor number of replica nodes per primary node
+	// 每个redis主节点的replica数量
 	ReplicationFactor *int32 `json:"replicationFactor,omitempty"`
 
 	// ServiceName name used to create the kubernetes service that fronts the RedisCluster nodes.
@@ -66,6 +67,7 @@ type RedisClusterSpec struct {
 	RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty"`
 
 	// Scaling configuration for redis key migration
+	// 扩缩容
 	Scaling *Migration `json:"scaling,omitempty"`
 
 	// Labels for created redis-cluster (deployment, rs, pod) (if any)

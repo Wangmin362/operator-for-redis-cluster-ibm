@@ -85,6 +85,7 @@ func (c *Controller) Reconcile(ctx context.Context, namespacedName ctrl.Request)
 	}()
 	result := ctrl.Result{}
 	sharedRedisCluster := &rapi.RedisCluster{}
+	// 查询当前redis-cluster资源
 	err = c.client.Get(ctx, namespacedName.NamespacedName, sharedRedisCluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -95,21 +96,25 @@ func (c *Controller) Reconcile(ctx context.Context, namespacedName ctrl.Request)
 		return result, err
 	}
 
+	// 看看主节点数量、副本数量、RollingUpdate、Scaling是否设置
 	if !rapi.IsRedisClusterDefaulted(sharedRedisCluster) {
+		// 如果没有设置，那么设置默认值
 		defaultedRedisCluster := rapi.DefaultRedisCluster(sharedRedisCluster)
+		// 更新前面设置的默认值
 		if result.Requeue = c.updateRedisClusterSpec(defaultedRedisCluster); result.Requeue {
 			return result, nil
 		}
 		glog.V(6).Infof("RedisCluster %s correctly defaulted", namespacedName)
 	}
 
+	// 判断是否RedisCluster资源已经被删除
 	if sharedRedisCluster.DeletionTimestamp != nil {
 		return result, nil
 	}
 
 	redisCluster := sharedRedisCluster.DeepCopy()
 
-	// init status.StartTime
+	// init status.StartTime 更新StartTime，其实就是第一次Reconcile时间
 	if redisCluster.Status.StartTime == nil {
 		redisCluster.Status.StartTime = &startTime
 		if result.Requeue = c.updateRedisClusterStatus(ctx, redisCluster); result.Requeue {
@@ -206,6 +211,7 @@ func (c *Controller) syncCluster(ctx context.Context, redisCluster *rapi.RedisCl
 	defer glog.V(6).Info("syncCluster STOP")
 	result := ctrl.Result{}
 
+	//
 	redisClusterConfigMap, err := c.reconcileConfigMap(ctx, redisCluster)
 	if err != nil {
 		glog.Errorf("RedisCluster-Operator.Reconcile unable to update config map associated with RedisCluster %s/%s: %v", redisCluster.Namespace, redisCluster.Name, err)
@@ -320,14 +326,17 @@ func (c *Controller) syncCluster(ctx context.Context, redisCluster *rapi.RedisCl
 	return result, nil
 }
 
+// 更新RedisCluster资源
 func (c *Controller) updateRedisClusterSpec(desiredCluster *rapi.RedisCluster) bool {
 	ctx := context.Background()
+	// 根据Name以及名称空间查询真实的RedisCluster资源
 	actualCluster, err := c.getRedisCluster(ctx, desiredCluster.Namespace, desiredCluster.Name)
 	if err != nil {
 		glog.Errorf("failed to get RedisCluster %s/%s: %v", desiredCluster.Namespace, desiredCluster.Name, err)
 		return false
 	}
 	actualCluster.Spec = desiredCluster.Spec
+	// 更新
 	if err = c.client.Update(ctx, actualCluster); err != nil {
 		if errors.IsConflict(err) {
 			glog.V(6).Infof("conflict occurred when updating RedisCluster %s/%s", desiredCluster.Namespace, desiredCluster.Name)

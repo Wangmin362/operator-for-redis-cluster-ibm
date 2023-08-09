@@ -73,6 +73,7 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
+	// TODO 这里垃圾收集的是什么？
 	gc := garbagecollector.NewGarbageCollector(mgr.GetClient())
 	go gc.Run(ctx.Done())
 
