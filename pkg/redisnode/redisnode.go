@@ -30,9 +30,12 @@ import (
 
 // RedisNode contains all info to run the redis-node.
 type RedisNode struct {
-	config     *Config
+	config *Config
+	// K8S ClientSet
 	kubeClient clientset.Interface
+	// RedisCluster工具
 	redisAdmin redis.AdminInterface
+	// RedisCluster工具的选项
 	admOptions redis.AdminOptions
 
 	// Kubernetes Probes handler
@@ -43,6 +46,7 @@ type RedisNode struct {
 
 // NewRedisNode builds and returns new RedisNode instance
 func NewRedisNode(cfg *Config) *RedisNode {
+	// 加载k8s kubeconfig
 	kubeConfig, err := initKubeConfig(cfg)
 	if err != nil {
 		glog.Fatalf("Unable to init rediscluster controller: %v", err)
@@ -53,6 +57,7 @@ func NewRedisNode(cfg *Config) *RedisNode {
 		glog.Fatalf("Unable to initialize kubeClient:%v", err)
 	}
 
+	// 本质上就是一个clientSet
 	rn := &RedisNode{
 		config:     cfg,
 		kubeClient: kubeClient,
@@ -63,6 +68,11 @@ func NewRedisNode(cfg *Config) *RedisNode {
 
 // Run executes the RedisNode
 func (r *RedisNode) Run(stop <-chan struct{}) error {
+	// 1、实例化RedisCluster客户端工具
+	// 2、借助第一步的RedisCluster客户端工具实例化对于redis节点的工具
+	// 3、更新redis节点的配置 TODO 不过，这一步，似乎有bug
+	// 4、清空/redis-data持久化目录
+	// 5、添加liveness probe以及readiness probe
 	node, err := r.init()
 	if err != nil {
 		return err
@@ -94,6 +104,11 @@ func initKubeConfig(c *Config) (*rest.Config, error) {
 	return rest.InClusterConfig()
 }
 
+// 1、实例化RedisCluster客户端工具
+// 2、借助第一步的RedisCluster客户端工具实例化对于redis节点的工具
+// 3、更新redis节点的配置 TODO 不过，这一步，似乎有bug
+// 4、清空/redis-data持久化目录
+// 5、添加liveness probe以及readiness probe
 func (r *RedisNode) init() (*Node, error) {
 	// Too fast restart of redis-server can result in slots lost
 	// This is due to a possible bug in Redis. Redis doesn't check that the node ID behind an IP is still the same after a disconnection/reconnection.
@@ -102,6 +117,7 @@ func (r *RedisNode) init() (*Node, error) {
 	// 2 * nodetimeout for failed state detection, voting, and safety
 	time.Sleep(r.config.RedisStartDelay)
 	ctx := context.Background()
+	// TODO 这里在干嘛?
 	nodesAddr, err := getRedisNodesAddrs(r.kubeClient, r.config.Cluster.Namespace, r.config.Cluster.NodeService)
 	if err != nil {
 		glog.Warning(err)
@@ -118,16 +134,20 @@ func (r *RedisNode) init() (*Node, error) {
 	}
 
 	r.admOptions = redis.AdminOptions{
-		ConnectionTimeout:  time.Duration(r.config.Redis.DialTimeout) * time.Millisecond,
+		ConnectionTimeout: time.Duration(r.config.Redis.DialTimeout) * time.Millisecond,
+		// 默认RenameCommandsFile是空的
 		RenameCommandsFile: r.config.Redis.GetRenameCommandsFile(),
 	}
+	// 获取当前机器的主机名
 	host, err := os.Hostname()
 	if err != nil {
 		r.admOptions.ClientName = host // will be pod name in kubernetes
 	}
 
+	// RedisCluster客户端工具
 	r.redisAdmin = redis.NewAdmin(ctx, nodesAddr, &r.admOptions)
 
+	// 用于代表对于一个节点上的Redis的操作
 	me := NewNode(r.config, r.redisAdmin)
 	if me == nil {
 		glog.Fatal("Unable to get Node information")
@@ -135,17 +155,21 @@ func (r *RedisNode) init() (*Node, error) {
 	defer me.Clear()
 
 	// reconfigure redis config file with proper IP/port
+	// 修改Redis的配置 TODO，这里似乎有bug，会不停写入配置文件
 	err = me.UpdateNodeConfigFile()
 	if err != nil {
 		glog.Fatal("Unable to update the configuration file, err:", err)
 	}
 
+	// 清空/redis-data持久化目录
 	err = me.ClearDataFolder() // may be needed if container crashes and restart at the same place
 	if err != nil {
 		glog.Errorf("Unable to clear data folder, err: %v", err)
 	}
 
+	// TODO http服务提供了什么能力？
 	r.httpServer = &http.Server{Addr: r.config.HTTPServerAddr}
+	// 添加liveness以及readiness probe
 	if err := r.configureHealth(ctx); err != nil {
 		glog.Errorf("unable to configure health checks, err:%v", err)
 		return nil, err
@@ -364,7 +388,8 @@ func testAndWaitConnection(ctx context.Context, addr string, maxWait time.Durati
 }
 
 func getRedisNodesAddrs(kubeClient clientset.Interface, namespace, service string) ([]string, error) {
-	addrs := []string{}
+	var addrs []string
+	// 获取redis cluster service的endpoint
 	eps, err := kubeClient.CoreV1().Endpoints(namespace).Get(context.Background(), service, metav1.GetOptions{})
 	if err != nil {
 		return addrs, err

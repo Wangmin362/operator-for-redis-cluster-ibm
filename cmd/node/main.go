@@ -16,6 +16,7 @@ import (
 
 func main() {
 	utils.BuildInfos()
+	// 实例化Redis配置
 	config := redisnode.NewRedisNodeConfig()
 	config.AddFlags(pflag.CommandLine)
 
@@ -27,6 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// 实例化RedisNode
 	rn := redisnode.NewRedisNode(config)
 
 	if err := run(rn); err != nil {
@@ -39,6 +41,7 @@ func main() {
 
 func run(rn *redisnode.RedisNode) error {
 	ctx, cancelFunc := context.WithCancel(context.Background())
+	// 优雅退出
 	go func(cancelFunc context.CancelFunc) {
 		sigc := make(chan os.Signal, 1)
 		signal.Notify(sigc,

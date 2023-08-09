@@ -70,6 +70,7 @@ func (r *Redis) GetRenameCommandsFile() string {
 	if r.renameCommandsFile == "" {
 		return ""
 	}
+	// 路径为：/etc/secret-volume
 	return path.Join(r.renameCommandsPath, r.renameCommandsFile)
 }
 

@@ -49,19 +49,23 @@ func (n *Node) Clear() {
 // UpdateNodeConfigFile update the redis config file with node information: ip, port
 func (n *Node) UpdateNodeConfigFile() error {
 	if n.config.Redis.ConfigFileName != config.RedisConfigFileDefault {
+		// redis.conf中新`include "/redis-conf/redis.conf"`配置，把redis默认配置加进来
 		if err := n.addSettingInConfigFile("include " + config.RedisConfigFileDefault); err != nil {
 			return err
 		}
 	}
 
+	// 默认监听6379端口
 	if err := n.addSettingInConfigFile("port " + n.config.Redis.ServerPort); err != nil {
 		return err
 	}
 
+	// 启用集群模式
 	if err := n.addSettingInConfigFile("cluster-enabled yes"); err != nil {
 		return err
 	}
 
+	// 设置redis可以使用的内存
 	if n.config.Redis.MaxMemory > 0 {
 		if err := n.addSettingInConfigFile(fmt.Sprintf("maxmemory %d", n.config.Redis.MaxMemory)); err != nil {
 			return err
@@ -76,34 +80,40 @@ func (n *Node) UpdateNodeConfigFile() error {
 			if err != nil {
 				return err
 			}
-			// use 70% of pod memory limit as maxmemory
+			// use 70% of pod memory limit as maxmemory  默认只使用节点的70%的内存
 			err = n.addSettingInConfigFile(fmt.Sprintf("maxmemory %d", uint64(float64(memLimitBytes)*0.7)))
 			if err != nil {
 				return err
 			}
 		}
 	}
+	// 设置内存策略
 	if n.config.Redis.MaxMemoryPolicy != config.RedisMaxMemoryPolicyDefault {
 		if err := n.addSettingInConfigFile(fmt.Sprintf("maxmemory-policy %s", n.config.Redis.MaxMemoryPolicy)); err != nil {
 			return err
 		}
 	}
 
+	// 所有IP地址都可以访问redis
 	if err := n.addSettingInConfigFile("bind 0.0.0.0"); err != nil {
 		return err
 	}
 
+	// 设置nodes.conf文件的位置
 	if err := n.addSettingInConfigFile("cluster-config-file /redis-data/node.conf"); err != nil {
 		return err
 	}
 
+	// redis持久化目录
 	if err := n.addSettingInConfigFile("dir /redis-data"); err != nil {
 		return err
 	}
 
+	// 这个应该是redis集群各个节点超时时间设置
 	if err := n.addSettingInConfigFile("cluster-node-timeout " + strconv.Itoa(n.config.Redis.ClusterNodeTimeout)); err != nil {
 		return err
 	}
+	// TODO 估计是redis的另外一个特性，可以执行某些命令
 	if n.config.Redis.GetRenameCommandsFile() != "" {
 
 		if err := n.addSettingInConfigFile("include " + n.config.Redis.GetRenameCommandsFile()); err != nil {
