@@ -14,6 +14,8 @@ import (
 	"github.com/IBM/operator-for-redis-cluster/pkg/utils"
 )
 
+// 1、所谓的node，实际上指的是redis集群中的一个节点
+// 2、node在启动之后，会启动redis-server，所以说一个node其实就是一个redis节点
 func main() {
 	utils.BuildInfos()
 	// 实例化Redis配置

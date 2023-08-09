@@ -72,7 +72,7 @@ func (r *RedisNode) Run(stop <-chan struct{}) error {
 	// 2、借助第一步的RedisCluster客户端工具实例化对于redis节点的工具
 	// 3、更新redis节点的配置 TODO 不过，这一步，似乎有bug
 	// 4、清空/redis-data持久化目录
-	// 5、添加liveness probe以及readiness probe
+	// 5、添加liveness probe以及readiness probe，增加 /live, /ready, /metric路由
 	node, err := r.init()
 	if err != nil {
 		return err
@@ -108,7 +108,7 @@ func initKubeConfig(c *Config) (*rest.Config, error) {
 // 2、借助第一步的RedisCluster客户端工具实例化对于redis节点的工具
 // 3、更新redis节点的配置 TODO 不过，这一步，似乎有bug
 // 4、清空/redis-data持久化目录
-// 5、添加liveness probe以及readiness probe
+// 5、添加liveness probe以及readiness probe，增加 /live, /ready, /metric路由
 func (r *RedisNode) init() (*Node, error) {
 	// Too fast restart of redis-server can result in slots lost
 	// This is due to a possible bug in Redis. Redis doesn't check that the node ID behind an IP is still the same after a disconnection/reconnection.
@@ -117,7 +117,7 @@ func (r *RedisNode) init() (*Node, error) {
 	// 2 * nodetimeout for failed state detection, voting, and safety
 	time.Sleep(r.config.RedisStartDelay)
 	ctx := context.Background()
-	// TODO 这里在干嘛?
+	// 在指定名称空间中查询redis cluster的endpoint，其实就是各个redis节点的ip地址
 	nodesAddr, err := getRedisNodesAddrs(r.kubeClient, r.config.Cluster.Namespace, r.config.Cluster.NodeService)
 	if err != nil {
 		glog.Warning(err)
@@ -141,6 +141,7 @@ func (r *RedisNode) init() (*Node, error) {
 	// 获取当前机器的主机名
 	host, err := os.Hostname()
 	if err != nil {
+		// TODO 这里是什么逻辑， err != nill才设置？ 逻辑写反了吧
 		r.admOptions.ClientName = host // will be pod name in kubernetes
 	}
 
@@ -170,6 +171,7 @@ func (r *RedisNode) init() (*Node, error) {
 	// TODO http服务提供了什么能力？
 	r.httpServer = &http.Server{Addr: r.config.HTTPServerAddr}
 	// 添加liveness以及readiness probe
+	// 增加 /live, /ready, /metric路由
 	if err := r.configureHealth(ctx); err != nil {
 		glog.Errorf("unable to configure health checks, err:%v", err)
 		return nil, err
@@ -182,7 +184,9 @@ func (r *RedisNode) run(me *Node) (*Node, error) {
 	ctx := context.Background()
 	// Start redis server and wait for it to be accessible
 	chRedis := make(chan error)
+	// 通过执行redis-server，启动redis，如果启动有错误，会把错误放到chRedis channel当中
 	go WrapRedis(r.config, chRedis)
+	// 等待redis启动完成，最多等待10秒钟，原理就是执行ping命令，如果redis server返回了PONG，说明redis server启动成功
 	starter := testAndWaitConnection(ctx, me.Addr, r.config.RedisStartWait)
 	if starter != nil {
 		glog.Error("Error while waiting for redis to start: ", starter)
@@ -193,15 +197,20 @@ func (r *RedisNode) run(me *Node) (*Node, error) {
 		// Initial redis server configuration
 		nodes, initCluster := r.isClusterInitialization(me.Addr)
 
+		// 需要初始化redis集群
 		if initCluster {
 			glog.Infof("Initializing cluster with slots from 0 to %d", redis.HashMaxSlots)
+			// 执行cluster addslots命令
 			if err := me.InitRedisCluster(ctx, me.Addr); err != nil {
 				glog.Error("Unable to init the cluster with this node, err:", err)
 				return false, err
 			}
 		} else {
 			glog.Infof("Attaching node to cluster")
+			// 和所有的redis节点建立连接，如果当前地址的redis节点已经成功建立，那么断开之后重新建立tcp连接，同时如果连接建立
+			// 成功，那么执行client setname <name>设置名字
 			r.redisAdmin.RebuildConnectionMap(ctx, nodes, &r.admOptions)
+			// 执行cluster meet命令，把redis节点加入集群
 			if err := me.AttachNodeToCluster(ctx, me.Addr); err != nil {
 				glog.Error("Unable to attach a node to the cluster, err:", err)
 				return false, nil
@@ -223,6 +232,7 @@ func (r *RedisNode) run(me *Node) (*Node, error) {
 
 func (r *RedisNode) isClusterInitialization(currentIP string) ([]string, bool) {
 	var initCluster = true
+	// 获取当前所有redis节点的ip地址，通过查询endpoint来获取
 	nodesAddr, _ := getRedisNodesAddrs(r.kubeClient, r.config.Cluster.Namespace, r.config.Cluster.NodeService)
 	if len(nodesAddr) > 0 {
 		initCluster = false
@@ -236,7 +246,7 @@ func (r *RedisNode) isClusterInitialization(currentIP string) ([]string, bool) {
 	}
 
 	if len(nodesAddr) == 1 && nodesAddr[0] == net.JoinHostPort(currentIP, r.config.Redis.ServerPort) {
-		// Init Primary cluster
+		// Init Primary cluster TODO 这玩意初始值也不对吧
 		initCluster = true
 	}
 
@@ -267,6 +277,7 @@ func (r *RedisNode) configureHealth(ctx context.Context) error {
 	addr := net.JoinHostPort("127.0.0.1", r.config.Redis.ServerPort)
 	health := healthcheck.NewHandler()
 	health.AddReadinessCheck("Check redis-node readiness", func() error {
+		// readiness probe实际上是通过执行 cluster slots命令，只要当返回的节点数量大于0，就返回ok
 		if err := readinessCheck(ctx, addr); err != nil {
 			glog.Errorf("readiness check failed, err:%v", err)
 			return err
@@ -275,6 +286,7 @@ func (r *RedisNode) configureHealth(ctx context.Context) error {
 	})
 
 	health.AddLivenessCheck("Check redis-node liveness", func() error {
+		// liveness probe，通过和redis家里socket连接，认为redis还存活
 		if err := livenessCheck(ctx, addr); err != nil {
 			glog.Errorf("liveness check failed, err:%v", err)
 			return err
@@ -359,7 +371,7 @@ func testAndWaitConnection(ctx context.Context, addr string, maxWait time.Durati
 		currentTime := time.Now()
 		timeout := waitTime - startTime.Sub(currentTime)
 		if timeout <= 0 {
-			return errors.New("Timeout reached")
+			return errors.New("timeout reached")
 		}
 		dialer := &radix.Dialer{
 			NetDialer: &net.Dialer{
@@ -387,6 +399,7 @@ func testAndWaitConnection(ctx context.Context, addr string, maxWait time.Durati
 	}
 }
 
+// 获取当前所有redis节点的ip地址，通过查询endpoint来获取
 func getRedisNodesAddrs(kubeClient clientset.Interface, namespace, service string) ([]string, error) {
 	var addrs []string
 	// 获取redis cluster service的endpoint

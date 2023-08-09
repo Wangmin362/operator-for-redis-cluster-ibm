@@ -18,6 +18,8 @@ import (
 type AdminConnectionsInterface interface {
 	// Add connect to the given address and
 	// register the client connection to the pool
+	// AdminConnections会保存和所有redis节点的名称，如果当前指定的地址的redis连接已经保存过，那么断开连接。然后重新建立连接
+	// 同时，如果连接建立成功，通过执行client setname <name>设置名称
 	Add(ctx context.Context, addr string) error
 	// Remove disconnect and remove the client connection from the map
 	Remove(addr string)
@@ -38,6 +40,8 @@ type AdminConnectionsInterface interface {
 	// AddAll connect to the given list of addresses and
 	// register them in the map
 	// fail silently
+	// 和所有的redis节点连接连接，如果当前地址的redis节点已经成功建立，那么断开之后重新建立tcp连接，同时如果连接建立
+	// 成功，那么执行client setname <name>设置名字
 	AddAll(ctx context.Context, addrs []string)
 	// ReplaceAll clear the map and re-populate it with new connections
 	// fail silently
@@ -46,6 +50,7 @@ type AdminConnectionsInterface interface {
 	// In case of error, customize the error, log it and return it.
 	ValidateResp(ctx context.Context, resp interface{}, err error, addr, errMessage string) error
 	// Reset close all connections and clear the connection map
+	// 关闭和所有redis节点的tcp连接
 	Reset()
 }
 
@@ -79,6 +84,8 @@ func NewAdminConnections(ctx context.Context, addrs []string, options *AdminOpti
 		}
 		cnx.clientName = options.ClientName
 	}
+	// 和所有的redis节点连接连接，如果当前地址的redis节点已经成功建立，那么断开之后重新建立tcp连接，同时如果连接建立
+	// 成功，那么执行client setname <name>设置名字
 	cnx.AddAll(ctx, addrs)
 	return cnx
 }
@@ -92,6 +99,8 @@ func (cnx *AdminConnections) Close() {
 
 // Add connect to the given address and
 // register the client connection to the map
+// AdminConnections会保存和所有redis节点的名称，如果当前指定的地址的redis连接已经保存过，那么断开连接。然后重新建立连接
+// 同时，如果连接建立成功，通过执行client setname <name>设置名称
 func (cnx *AdminConnections) Add(ctx context.Context, addr string) error {
 	_, err := cnx.Update(ctx, addr)
 	return err
@@ -107,12 +116,14 @@ func (cnx *AdminConnections) Remove(addr string) {
 
 // Update returns a client connection for the given adress,
 // connects if the connection is not in the map yet
+// AdminConnections会保存和所有redis节点的名称，如果当前指定的地址的redis连接已经保存过，那么断开连接。然后重新建立连接
+// 同时，如果连接建立成功，通过执行client setname <name>设置名称
 func (cnx *AdminConnections) Update(ctx context.Context, addr string) (ClientInterface, error) {
 	// if already exist close the current connection
 	if c, ok := cnx.clients[addr]; ok {
 		c.Close()
 	}
-
+	// 和给定地址的redis建立tcp连接，并通过执行client setname设置名称
 	c, err := cnx.connect(ctx, addr)
 	if err == nil && c != nil {
 		cnx.clients[addr] = c
@@ -189,6 +200,8 @@ func (cnx *AdminConnections) Reconnect(ctx context.Context, addr string) error {
 
 // AddAll connect the given list of addresses and add them to the connection map
 // fail silently
+// 和所有的redis节点连接连接，如果当前地址的redis节点已经成功建立，那么断开之后重新建立tcp连接，同时如果连接建立
+// 成功，那么执行client setname <name>设置名字
 func (cnx *AdminConnections) AddAll(ctx context.Context, addrs []string) {
 	for _, addr := range addrs {
 		err := cnx.Add(ctx, addr)
@@ -267,6 +280,7 @@ func (cnx *AdminConnections) handleError(ctx context.Context, addr string, err e
 	return false
 }
 
+// 和给定地址的redis建立tcp连接，并通过执行client setname设置名称
 func (cnx *AdminConnections) connect(ctx context.Context, addr string) (ClientInterface, error) {
 	c, err := NewClient(ctx, addr, cnx.connectionTimeout, cnx.commandsMapping)
 	if err != nil {

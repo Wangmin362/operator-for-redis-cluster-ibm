@@ -22,6 +22,7 @@ import (
 // AdminInterface redis cluster admin interface
 type AdminInterface interface {
 	// Connections returns the connection map of all clients
+	// 获取和所哟
 	Connections() AdminConnectionsInterface
 	// Close the admin connections
 	Close()
@@ -68,6 +69,9 @@ type AdminInterface interface {
 	// GetHashMaxSlot gets the max slot value
 	GetHashMaxSlot() Slot
 	// RebuildConnectionMap rebuilds the connection map according to the given addresses
+	// 1、和所有的redis节点连接连接，如果当前地址的redis节点已经成功建立，那么断开之后重新建立tcp连接，同时如果连接建立
+	// 成功，那么执行client setname <name>设置名字
+	// 2、所谓的ConnectionMap，其实就是一个map，AdminInterface会把所有的redis连接都保留下来
 	RebuildConnectionMap(ctx context.Context, addrs []string, options *AdminOptions)
 	// GetConfig gets the running redis server configuration matching the pattern
 	GetConfig(ctx context.Context, pattern string) (map[string]string, error)
@@ -148,6 +152,7 @@ func (a *Admin) AttachNodeToCluster(ctx context.Context, addr string) error {
 		return err
 	}
 
+	// 获取和所有redis节点连接
 	all := a.Connections().GetAll()
 	if len(all) == 0 {
 		return fmt.Errorf("no connection for other redis-node found")
@@ -157,6 +162,7 @@ func (a *Admin) AttachNodeToCluster(ctx context.Context, addr string) error {
 			continue
 		}
 		var resp string
+		// 执行cluster meet命令
 		cmdErr := c.DoCmd(ctx, &resp, "CLUSTER", "MEET", ip, port)
 		if err = a.Connections().ValidateResp(ctx, &resp, cmdErr, addr, "unable to attach node to cluster"); err != nil {
 			return err
@@ -413,6 +419,7 @@ func (a *Admin) AddSlots(ctx context.Context, addr string, slots SlotSlice) erro
 	if len(slots) == 0 {
 		return nil
 	}
+	// 获取当前节点的连接
 	c, err := a.Connections().Get(ctx, addr)
 	if err != nil {
 		return err
@@ -421,6 +428,7 @@ func (a *Admin) AddSlots(ctx context.Context, addr string, slots SlotSlice) erro
 	args := []string{"ADDSLOTS"}
 	args = append(args, slots.ConvertToStrings()...)
 	err = c.DoCmd(ctx, &resp, "CLUSTER", args...)
+	// 执行cluster addslots命令
 	return a.Connections().ValidateResp(ctx, &resp, err, addr, "unable to execute ADDSLOTS")
 }
 
@@ -743,7 +751,10 @@ func (a *Admin) getInfos(ctx context.Context, c ClientInterface, addr string) (*
 
 // RebuildConnectionMap rebuild the connection map according to the given addresses
 func (a *Admin) RebuildConnectionMap(ctx context.Context, addrs []string, options *AdminOptions) {
+	// 关闭和所有redis节点的tcp连接
 	a.cnx.Reset()
+	// 和所有的redis节点连接连接，如果当前地址的redis节点已经成功建立，那么断开之后重新建立tcp连接，同时如果连接建立
+	// 成功，那么执行client setname <name>设置名字
 	a.cnx = NewAdminConnections(ctx, addrs, options)
 }
 
