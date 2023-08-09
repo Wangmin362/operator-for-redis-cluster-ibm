@@ -91,6 +91,15 @@ install-redis:
 uninstall-redis:
 	kubectl delete -f deploy/sample/redis-cluster.yaml
 
+# 创建名称空间
+.PHONY: install-namespace
+install-namespace:
+	kubectl create -f deploy/namespace.yaml
+
+# 删除名称空间
+.PHONY: uninstall-namespace
+uninstall-namespace:
+	kubectl delete -f deploy/namespace.yaml
 
 test:
 	./go.test.sh
