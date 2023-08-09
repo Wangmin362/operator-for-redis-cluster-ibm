@@ -1,7 +1,7 @@
 ARTIFACT_OPERATOR=redis-operator
 ARTIFACT_INITCONTAINER=init-container
 
-PREFIX=172.22.175.150/devops/redis-
+PREFIX=172.30.3.150/devops/redis-
 
 SOURCES := $(shell find . ! -name "*_test.go" -name '*.go')
 

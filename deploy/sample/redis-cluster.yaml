@@ -144,7 +144,7 @@ spec:
         - name: redis-node
           securityContext:
             {}
-          image: "172.22.175.150/devops/redis-node:latest"
+          image: "172.30.3.150/devops/redis-node:latest"
           imagePullPolicy: Always
           args: [
             "--v=1",
