@@ -114,7 +114,7 @@ func (c *Controller) Reconcile(ctx context.Context, namespacedName ctrl.Request)
 
 	redisCluster := sharedRedisCluster.DeepCopy()
 
-	// init status.StartTime 更新StartTime，其实就是第一次Reconcile时间
+	// 更新RedisCluster.Status.StartTime，其实就是第一次Reconcile时间
 	if redisCluster.Status.StartTime == nil {
 		redisCluster.Status.StartTime = &startTime
 		if result.Requeue = c.updateRedisClusterStatus(ctx, redisCluster); result.Requeue {
@@ -314,6 +314,7 @@ func (c *Controller) syncCluster(ctx context.Context, redisCluster *rapi.RedisCl
 	}
 
 	if allPodsReady {
+		// 对比Redis的配置是否发生了变化
 		configChanges, err := checkServerConfig(ctx, admin, redisClusterConfigMap)
 		if err != nil {
 			glog.Warningf("unable to get server config: %v", err)
