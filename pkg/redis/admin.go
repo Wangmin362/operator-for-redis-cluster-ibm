@@ -94,7 +94,7 @@ type Admin struct {
 
 // NewRedisAdmin builds and returns new Admin from the list of pods
 func NewRedisAdmin(ctx context.Context, pods []corev1.Pod, cfg *config.Redis) (AdminInterface, error) {
-	nodesAddrs := []string{}
+	var nodesAddrs []string
 	for _, pod := range pods {
 		redisPort := DefaultRedisPort
 		for _, container := range pod.Spec.Containers {
@@ -189,6 +189,8 @@ func (a *Admin) GetClusterInfos(ctx context.Context) (*ClusterInfos, error) {
 	clusterErr := NewClusterInfosError()
 
 	for addr, c := range a.Connections().GetAll() {
+		// 通过执行cluster nodes获取redis信息
+		// 通过执行info server获取redis server启动时长
 		nodeinfos, err := a.getInfos(ctx, c, addr)
 		if err != nil {
 			infos.Status = ClusterInfoPartial
@@ -723,6 +725,7 @@ func selectMyReplicas(me *Node, nodes Nodes) (Nodes, error) {
 
 func (a *Admin) getInfos(ctx context.Context, c ClientInterface, addr string) (*NodeInfos, error) {
 	var resp string
+	// 执行cluster node命令，然后解析
 	cmdErr := c.DoCmd(ctx, &resp, "CLUSTER", "NODES")
 	if err := a.Connections().ValidateResp(ctx, &resp, cmdErr, addr, "unable to retrieve node info"); err != nil {
 		return nil, err
@@ -737,6 +740,7 @@ func (a *Admin) getInfos(ctx context.Context, c ClientInterface, addr string) (*
 		}
 
 		var serverStartTime time.Time
+		// 获取当前redis server的启动时长
 		serverStartTime, err := DecodeNodeStartTime(&resp)
 
 		if err != nil {

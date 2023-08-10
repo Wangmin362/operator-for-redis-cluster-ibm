@@ -125,13 +125,17 @@ func (c *Controller) Reconcile(ctx context.Context, namespacedName ctrl.Request)
 	return c.syncCluster(ctx, redisCluster)
 }
 
+// 获取和RedisCluster资源同名的ConfigMap(这个ConfigMap中包含的是redis的配置)，如果这个ConfigMap的OwnerReference为空，
+// 那么将这个ConfigMap的OwnerReference设置为当前的RedisCluster资源
 func (c *Controller) reconcileConfigMap(ctx context.Context, cluster *rapi.RedisCluster) (*v1.ConfigMap, error) {
+	// 获取一个和RedisCluster同名的Configmap，实际上这个configmap中的数据为redis配置
 	cm, err := c.getRedisClusterConfigMap(cluster)
 	if err != nil {
 		glog.Errorf("unable to get redis cluster config map: %v", err)
 		return nil, err
 	}
 	if len(cm.OwnerReferences) == 0 {
+		// 设置并更新OwnerReference
 		if err = controllerutil.SetControllerReference(cluster, cm, c.mgr.GetScheme()); err != nil {
 			return nil, err
 		}
@@ -156,13 +160,16 @@ func (c *Controller) getRedisCluster(ctx context.Context, namespace, name string
 }
 
 func (c *Controller) getRedisClusterService(cluster *rapi.RedisCluster) (*v1.Service, error) {
+	// serviceName = RedisCluster.Spec.ServiceName
 	serviceName := getServiceName(cluster)
+	// 构建Service的标签
 	labels, err := pod.GetLabelsSet(cluster)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get cluster label, err: %v ", err)
 	}
 
 	svcList := &v1.ServiceList{}
+	// 根据标签在特定名称空间中查找符合条件的Service
 	err = c.client.List(context.Background(), svcList, kclient.InNamespace(cluster.Namespace), kclient.MatchingLabelsSelector{Selector: labels.AsSelector()})
 	if err != nil {
 		return nil, fmt.Errorf("couldn't list service with label:%s, err:%v ", labels.String(), err)
@@ -211,25 +218,29 @@ func (c *Controller) syncCluster(ctx context.Context, redisCluster *rapi.RedisCl
 	defer glog.V(6).Info("syncCluster STOP")
 	result := ctrl.Result{}
 
-	//
+	// 获取和RedisCluster资源同名的ConfigMap(这个ConfigMap中包含的是redis的配置)，如果这个ConfigMap的OwnerReference为空，
+	// 那么将这个ConfigMap的OwnerReference设置为当前的RedisCluster资源
 	redisClusterConfigMap, err := c.reconcileConfigMap(ctx, redisCluster)
 	if err != nil {
 		glog.Errorf("RedisCluster-Operator.Reconcile unable to update config map associated with RedisCluster %s/%s: %v", redisCluster.Namespace, redisCluster.Name, err)
 		return result, err
 	}
 
+	// 获取Service
 	redisClusterService, err := c.getRedisClusterService(redisCluster)
 	if err != nil {
 		glog.Errorf("RedisCluster-Operator.Reconcile unable to retrieve service associated with RedisCluster: %s/%s", redisCluster.Namespace, redisCluster.Name)
 		return result, err
 	}
 	if redisClusterService == nil {
+		// 如果没有找到Service，那么创建一个Headless Service
 		if _, err = c.serviceControl.CreateRedisClusterService(redisCluster); err != nil {
 			glog.Errorf("RedisCluster-Operator.Reconcile unable to create service associated with RedisCluster: %s/%s", redisCluster.Namespace, redisCluster.Name)
 			return result, err
 		}
 	}
 
+	// 如果没有创建PDB，那么创建PDB
 	redisClusterPodDisruptionBudget, err := c.getRedisClusterPodDisruptionBudget(redisCluster)
 	if err != nil {
 		glog.Errorf("RedisCluster-Operator.Reconcile unable to retrieve podDisruptionBudget associated with RedisCluster: %s/%s", redisCluster.Namespace, redisCluster.Name)
@@ -242,27 +253,32 @@ func (c *Controller) syncCluster(ctx context.Context, redisCluster *rapi.RedisCl
 		}
 	}
 
+	// 根据标签找到合适的pods
 	redisPods, err := c.podControl.GetRedisClusterPods(redisCluster)
 	if err != nil {
 		glog.Errorf("RedisCluster-Operator.Reconcile unable to retrieve pods associated with RedisCluster: %s/%s", redisCluster.Namespace, redisCluster.Name)
 		return result, err
 	}
 
+	// TODO pods以及lostPods有啥区别？
 	pods, lostPods := filterLostNodes(redisPods)
 	if len(lostPods) != 0 {
 		for _, p := range lostPods {
+			// 删除Pods
 			err = c.podControl.DeletePodNow(redisCluster, p.Name)
 			glog.Errorf("Lost node associated with pod %s: %v", p.Name, err)
 		}
 		redisPods = pods
 	}
 
+	// 和当前已知的节点建立tcp链接
 	admin, err := redis.NewRedisAdmin(ctx, redisPods, &c.config.redis)
 	if err != nil {
 		return result, fmt.Errorf("unable to create the redis.Admin, err:%v", err)
 	}
 	defer admin.Close()
 
+	// 每个节点都执行cluster node, info server命令获取集群信息
 	clusterInfos, errGetInfos := admin.GetClusterInfos(ctx)
 	if errGetInfos != nil {
 		glog.Errorf("error when getting cluster infos to rebuild bom : %v", errGetInfos)
@@ -271,6 +287,7 @@ func (c *Controller) syncCluster(ctx context.Context, redisCluster *rapi.RedisCl
 		}
 	}
 
+	// 获取node信息
 	kubeNodes, err := utils.GetKubeNodes(ctx, c.client, redisCluster.Spec.PodTemplate.Spec.NodeSelector)
 	if err != nil {
 		glog.Errorf("error getting k8s nodes with label selector %q: %v", redisCluster.Spec.PodTemplate.Spec.NodeSelector, err)
